@@ -1,11 +1,12 @@
-from model import Planet
+from model import *
 
-model = Planet(3,5,5,4,3)
+model = Planet(3,5,5,25,2)
 
-model.show_grid()
-
-for _ in range(1):
+for _ in range(300):
+    model.show_grid()
     model.step()
     print()
 
-model.show_grid()
+for agent in model.agents:
+    if isinstance(agent, SimpleAgent):
+        print(f"agent {agent.unique_id} has collected {agent.collected_resources} resources")
