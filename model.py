@@ -1,5 +1,8 @@
+import random
+
 import mesa
 from mesa.time import RandomActivation
+from numpy.matlib import empty
 
 
 class SimpleAgent(mesa.Agent):
@@ -9,7 +12,7 @@ class SimpleAgent(mesa.Agent):
         self.score = 0
         self.has_resource = False
 
-    def move_randomly(self):
+    def move(self):
         possible_steps = self.model.grid.get_neighborhood(
             self.pos,
             moore=True,
@@ -30,27 +33,126 @@ class SimpleAgent(mesa.Agent):
                     self.model.grid.remove_agent(obj)
                     break
 
-    def get_back_to_base(self):
+    def go_back_to_base(self):
         if self.has_resource:
             current_x, current_y = self.pos
-            base_x, base_y = self.model.base_pos
-            next_x = current_x + (1 if base_x > current_x else -1 if base_x < current_x else 0)
-            next_y = current_y + (1 if base_y > current_y else -1 if base_y < current_y else 0)
+            destination_x, destination_y = self.model.base_pos
+            next_x = current_x + (1 if destination_x > current_x else -1 if destination_x < current_x else 0)
+            next_y = current_y + (1 if destination_y > current_y else -1 if destination_y < current_y else 0)
 
             next_pos = (next_x, next_y)
 
             if next_pos not in self.model.obstacles:
                 self.model.grid.move_agent(self, next_pos)
             else:
-                (self.move_randomly())
+                (self.move())
 
     def is_at_base(self):
         return self.pos == self.model.base_pos;
 
     def deliver_resource(self):
-        if (self.has_resource and self.pos == self.model.base_pos):
+        if self.has_resource and self.is_at_base():
             self.collected_resources += 1
             self.has_resource = False
+
+    def step(self):
+        self.collect_resource()
+        if self.has_resource:
+            self.go_back_to_base()
+            self.deliver_resource()
+        else:
+            self.move()
+
+class StateBasedAgent(SimpleAgent):
+    EXPLORED = True
+    UNEXPLORED = False
+    def __init__(self, model):
+        super().__init__(model)
+        self.explored = dict() # Dicionario que mapeia um par ordenado em -> Explorado/Não Explorado
+
+    def move(self):
+        self.explored[self.pos] = self.EXPLORED
+        possible_steps = self.model.grid.get_neighborhood(
+            self.pos, moore=True, include_center=False
+        )
+        unexplored_steps = []
+        for step in possible_steps:
+            if self.explored.get(step) is None and step not in self.model.obstacles:
+                unexplored_steps.append(step)
+
+        if len(unexplored_steps) > 0:
+            new_position = self.random.choice(unexplored_steps)
+        else:
+            new_position = self.random.choice(possible_steps)
+            while new_position in self.model.obstacles:
+                new_position = self.random.choice(possible_steps)
+
+        self.model.grid.move_agent(self, new_position)
+
+    def collect_resource(self):
+        if not self.has_resource:
+            cell_contents = self.model.grid.get_cell_list_contents(self.pos)
+            for obj in cell_contents:
+                if isinstance(obj, Resource):
+                    self.has_resource = True
+                    self.model.grid.remove_agent(obj)
+                    return
+
+class ObjectiveBasedAgent(StateBasedAgent):
+    def __init__(self, model):
+        super().__init__(model)
+        self.known_resources = list()
+        self.next_objective = None
+
+    def collect_resource(self):
+        cell_contents = self.model.grid.get_cell_list_contents(self.pos)
+        for obj in cell_contents:
+            if isinstance(obj, Resource):
+                if not self.has_resource:
+                    self.has_resource = True
+                    self.model.grid.remove_agent(obj)
+                else:
+                    if self.pos not in self.known_resources:
+                        self.known_resources.append(self.pos)
+
+    def deliver_resource(self):
+        if self.has_resource and self.is_at_base():
+            self.collected_resources += 1
+            self.has_resource = False
+            if len(self.known_resources) > 0:
+                self.next_objective = self.known_resources.pop()
+            else:
+                self.next_objective = None
+
+    def go_to_next_objective(self):
+        current_x, current_y = self.pos
+        destination_x, destination_y = self.next_objective
+        next_x = current_x + (1 if destination_x > current_x else -1 if destination_x < current_x else 0)
+        next_y = current_y + (1 if destination_y > current_y else -1 if destination_y < current_y else 0)
+
+        next_pos = (next_x, next_y)
+
+        if (next_pos == self.pos):
+            self.next_objective = None
+
+
+        if next_pos not in self.model.obstacles:
+            self.model.grid.move_agent(self, next_pos)
+        else:
+            self.move()
+
+
+    def step(self):
+        self.collect_resource()
+        if self.has_resource:
+            self.go_back_to_base()
+            self.deliver_resource()
+        else:
+            if self.next_objective is not None:
+                print("NEXT OBJECTIVE NOT NONE")
+                self.go_to_next_objective()
+            else:
+                self.move()
 
 class Resource(mesa.Agent):
     SMALL = 0
@@ -73,9 +175,12 @@ class Obstacle(mesa.Agent):
         super().__init__(model)
 
 class Planet(mesa.Model):
-    def __init__(self, n_agents , height, width, n_resources , n_obstacles, base_pos = (0,0), seed=None):
+    def __init__(self, n_SA,
+                 n_SBA, n_OBA, height, width, n_resources , n_obstacles=0, base_pos = (0,0), seed=None):
         super().__init__(seed=seed)
-        self.NumAgents = n_agents
+        self.n_SA = n_SA;
+        self.n_SBA = n_SBA
+        self.n_OBA = n_OBA
         self.obstacles = []
         self.grid = mesa.space.MultiGrid(height,width, torus=False)
         self.base_pos = base_pos
@@ -91,17 +196,21 @@ class Planet(mesa.Model):
             x = self.random.randrange(width)
             y = self.random.randrange(height)
 
-            if (x,y) != (0,0):
+            if (x,y) != base_pos:
                 self.grid.place_agent(Obstacle(self), (x,y))
                 self.obstacles.append((x,y))
 
-        for _ in range(n_agents):
-            x = self.random.randrange(width)
-            y = self.random.randrange(height)
-
+        for _ in range(n_SA):
             a = SimpleAgent(self)
             self.grid.place_agent(a, base_pos)
-            #self.schedule.add(a)
+
+        for _ in range(n_SBA):
+            a = StateBasedAgent(self)
+            self.grid.place_agent(a, base_pos)
+
+        for _ in range(n_OBA):
+            a = ObjectiveBasedAgent(self)
+            self.grid.place_agent(a, base_pos)
 
     def show_grid(self):
         GREEN = "\033[92m"
@@ -124,6 +233,7 @@ class Planet(mesa.Model):
                                 print(f"{BLUE}{obj.unique_id}{RESET}  ", end="")
                             else:
                                 print(f"{GREEN}{obj.unique_id}{RESET}  ", end="")
+
                         else:
                             print("X  ", end="")
                 else:
@@ -134,9 +244,4 @@ class Planet(mesa.Model):
     def step(self):
         for agent in self.agents:
             if isinstance(agent, SimpleAgent):
-                agent.collect_resource()
-                if agent.has_resource:
-                    agent.get_back_to_base()
-                    agent.deliver_resource()
-                else:
-                    agent.move_randomly()
+                agent.step()
