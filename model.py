@@ -48,7 +48,7 @@ class SimpleAgent(mesa.Agent):
                 (self.move())
 
     def is_at_base(self):
-        return self.pos == self.model.base_pos;
+        return self.pos == self.model.base_pos
 
     def deliver_resource(self):
         if self.has_resource and self.is_at_base():
