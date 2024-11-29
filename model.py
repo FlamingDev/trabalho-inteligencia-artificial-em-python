@@ -178,7 +178,7 @@ class Planet(mesa.Model):
     def __init__(self, n_SA,
                  n_SBA, n_OBA, height, width, n_resources , n_obstacles=0, base_pos = (0,0), seed=None):
         super().__init__(seed=seed)
-        self.n_SA = n_SA;
+        self.n_SA = n_SA
         self.n_SBA = n_SBA
         self.n_OBA = n_OBA
         self.obstacles = []
