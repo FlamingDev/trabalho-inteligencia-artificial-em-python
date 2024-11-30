@@ -1,178 +1,15 @@
 import random
-
+import pandas as pd
 import mesa
-from mesa.time import RandomActivation
+#from mesa.time import RandomActivation
 from numpy.matlib import empty
 
+from SimpleAgent import SimpleAgent
+from ObjectiveBasedAgent import ObjectiveBasedAgent
+from StateBasedAgent import StateBasedAgent
+from Resource import Resource
+from Obstacle import Obstacle
 
-class SimpleAgent(mesa.Agent):
-    def __init__(self, model):
-        super().__init__(model)
-        self.collected_resources = 0
-        self.score = 0
-        self.has_resource = False
-
-    def move(self):
-        possible_steps = self.model.grid.get_neighborhood(
-            self.pos,
-            moore=True,
-            include_center=False)
-
-        new_position = self.random.choice(possible_steps)
-        while new_position in self.model.obstacles:
-            new_position = self.random.choice(possible_steps)
-
-        self.model.grid.move_agent(self, new_position)
-
-    def collect_resource(self):
-        if not self.has_resource:
-            cell_contents = self.model.grid.get_cell_list_contents(self.pos)
-            for obj in cell_contents:
-                if isinstance(obj, Resource):
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                    break
-
-    def go_back_to_base(self):
-        if self.has_resource:
-            current_x, current_y = self.pos
-            destination_x, destination_y = self.model.base_pos
-            next_x = current_x + (1 if destination_x > current_x else -1 if destination_x < current_x else 0)
-            next_y = current_y + (1 if destination_y > current_y else -1 if destination_y < current_y else 0)
-
-            next_pos = (next_x, next_y)
-
-            if next_pos not in self.model.obstacles:
-                self.model.grid.move_agent(self, next_pos)
-            else:
-                (self.move())
-
-    def is_at_base(self):
-        return self.pos == self.model.base_pos;
-
-    def deliver_resource(self):
-        if self.has_resource and self.is_at_base():
-            self.collected_resources += 1
-            self.has_resource = False
-
-    def step(self):
-        self.collect_resource()
-        if self.has_resource:
-            self.go_back_to_base()
-            self.deliver_resource()
-        else:
-            self.move()
-
-class StateBasedAgent(SimpleAgent):
-    EXPLORED = True
-    UNEXPLORED = False
-    def __init__(self, model):
-        super().__init__(model)
-        self.explored = dict() # Dicionario que mapeia um par ordenado em -> Explorado/Não Explorado
-
-    def move(self):
-        self.explored[self.pos] = self.EXPLORED
-        possible_steps = self.model.grid.get_neighborhood(
-            self.pos, moore=True, include_center=False
-        )
-        unexplored_steps = []
-        for step in possible_steps:
-            if self.explored.get(step) is None and step not in self.model.obstacles:
-                unexplored_steps.append(step)
-
-        if len(unexplored_steps) > 0:
-            new_position = self.random.choice(unexplored_steps)
-        else:
-            new_position = self.random.choice(possible_steps)
-            while new_position in self.model.obstacles:
-                new_position = self.random.choice(possible_steps)
-
-        self.model.grid.move_agent(self, new_position)
-
-    def collect_resource(self):
-        if not self.has_resource:
-            cell_contents = self.model.grid.get_cell_list_contents(self.pos)
-            for obj in cell_contents:
-                if isinstance(obj, Resource):
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                    return
-
-class ObjectiveBasedAgent(StateBasedAgent):
-    def __init__(self, model):
-        super().__init__(model)
-        self.known_resources = list()
-        self.next_objective = None
-
-    def collect_resource(self):
-        cell_contents = self.model.grid.get_cell_list_contents(self.pos)
-        for obj in cell_contents:
-            if isinstance(obj, Resource):
-                if not self.has_resource:
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                else:
-                    if self.pos not in self.known_resources:
-                        self.known_resources.append(self.pos)
-
-    def deliver_resource(self):
-        if self.has_resource and self.is_at_base():
-            self.collected_resources += 1
-            self.has_resource = False
-            if len(self.known_resources) > 0:
-                self.next_objective = self.known_resources.pop()
-            else:
-                self.next_objective = None
-
-    def go_to_next_objective(self):
-        current_x, current_y = self.pos
-        destination_x, destination_y = self.next_objective
-        next_x = current_x + (1 if destination_x > current_x else -1 if destination_x < current_x else 0)
-        next_y = current_y + (1 if destination_y > current_y else -1 if destination_y < current_y else 0)
-
-        next_pos = (next_x, next_y)
-
-        if (next_pos == self.pos):
-            self.next_objective = None
-
-
-        if next_pos not in self.model.obstacles:
-            self.model.grid.move_agent(self, next_pos)
-        else:
-            self.move()
-
-
-    def step(self):
-        self.collect_resource()
-        if self.has_resource:
-            self.go_back_to_base()
-            self.deliver_resource()
-        else:
-            if self.next_objective is not None:
-                print("NEXT OBJECTIVE NOT NONE")
-                self.go_to_next_objective()
-            else:
-                self.move()
-
-class Resource(mesa.Agent):
-    SMALL = 0
-    MEDIUM = 1
-    HEAVY = 2
-
-    def __init__(self, size, model):
-        super().__init__(model)
-        self.size = size
-        if size == self.SMALL:
-            self.utility = 10
-        elif size == self.MEDIUM:
-            self.utility = 20
-        else:
-            self.utility = 50
-
-class Obstacle(mesa.Agent):
-
-    def __init__(self, model):
-        super().__init__(model)
 
 class Planet(mesa.Model):
     def __init__(self, n_SA,
@@ -182,23 +19,23 @@ class Planet(mesa.Model):
         self.n_SBA = n_SBA
         self.n_OBA = n_OBA
         self.obstacles = []
-        self.grid = mesa.space.MultiGrid(height,width, torus=False)
+        self.grid = mesa.space.MultiGrid(int(width), int(height), torus=False)
         self.base_pos = base_pos
 
         for _ in range(n_resources):
-            x = self.random.randrange(width)
-            y = self.random.randrange(height)
-
+            x, y = self.random.randrange(width), self.random.randrange(height)
+            while (x, y) == base_pos or (x, y) in self.obstacles:
+                x, y = self.random.randrange(width), self.random.randrange(height)
             size = self.random.choice([Resource.SMALL, Resource.MEDIUM, Resource.HEAVY])
-            self.grid.place_agent(Resource(size,self), (x,y))
+            self.grid.place_agent(Resource(size, self), (x, y))
 
         for _ in range(n_obstacles):
-            x = self.random.randrange(width)
-            y = self.random.randrange(height)
+            x, y = self.random.randrange(width), self.random.randrange(height)
+            while (x, y) == base_pos or (x, y) in self.obstacles:
+                x, y = self.random.randrange(width), self.random.randrange(height)
+            self.grid.place_agent(Obstacle(self), (x, y))
+            self.obstacles.append((x, y))
 
-            if (x,y) != base_pos:
-                self.grid.place_agent(Obstacle(self), (x,y))
-                self.obstacles.append((x,y))
 
         for _ in range(n_SA):
             a = SimpleAgent(self)
@@ -212,36 +49,34 @@ class Planet(mesa.Model):
             a = ObjectiveBasedAgent(self)
             self.grid.place_agent(a, base_pos)
 
-    def show_grid(self):
-        GREEN = "\033[92m"
-        BLUE = "\033[94m"
-        RESET = "\033[0m"
-        RED = "\033[91m"
-
-        for i in range(self.grid.width):
-            for j in range(self.grid.height):
-                cell_contents = self.grid.get_cell_list_contents((i, j))
-                print(f"{i, j} ", end="")
-                if len(cell_contents) > 0:
-                    for obj in cell_contents:
-                        if isinstance(obj, Resource):
-                            print(f"{RED}R{RESET}  ", end="")
-                        elif isinstance(obj, Obstacle):
-                            print("O  ", end="")
-                        elif isinstance(obj, SimpleAgent):
-                            if obj.has_resource:
-                                print(f"{BLUE}{obj.unique_id}{RESET}  ", end="")
-                            else:
-                                print(f"{GREEN}{obj.unique_id}{RESET}  ", end="")
-
-                        else:
-                            print("X  ", end="")
-                else:
-                    print("X  ", end="")
-
-            print()
 
     def step(self):
+    # Verifica todos os agentes
         for agent in self.agents:
             if isinstance(agent, SimpleAgent):
-                agent.step()
+                agent.step()  # Movimenta o agente ou coleta o recurso
+
+        # Certifique-se de que os objetos estáticos (obstáculos, recursos) permaneçam intactos
+        for (x, y) in self.obstacles:
+            if not any(isinstance(obj, Obstacle) for obj in self.grid.get_cell_list_contents((x, y))):
+                self.grid.place_agent(Obstacle(self), (x, y))
+
+    
+
+    def to_dataframe(self):
+        self.data = []
+        for x in range(self.grid.width):
+            for y in range(self.grid.height):
+                cell_contents = self.grid.get_cell_list_contents((x, y))
+                for obj in cell_contents:
+                    if isinstance(obj, Resource) or isinstance(obj, Obstacle) or isinstance(obj, SimpleAgent):
+                        self.data.append({
+                            "x": int(x),
+                            "y": int(y),
+                            "type": obj.type,  
+                            "color": obj.color,  
+                            "shape": obj.shape
+                        })
+        return pd.DataFrame(self.data)
+
+

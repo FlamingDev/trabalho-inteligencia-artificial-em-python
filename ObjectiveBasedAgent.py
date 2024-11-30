@@ -1,0 +1,61 @@
+from StateBasedAgent import StateBasedAgent
+from Resource import Resource
+
+class ObjectiveBasedAgent(StateBasedAgent):
+    def __init__(self, model):
+        super().__init__(model)
+        self.known_resources = list()
+        self.next_objective = None
+        self.type = "ObjectiveBasedAgent"  
+        self.color = "black" 
+        self.shape = "cross"
+
+    def collect_resource(self):
+        cell_contents = self.model.grid.get_cell_list_contents(self.pos)
+        for obj in cell_contents:
+            if isinstance(obj, Resource):
+                if not self.has_resource:
+                    self.has_resource = True
+                    self.model.grid.remove_agent(obj)
+                else:
+                    if self.pos not in self.known_resources:
+                        self.known_resources.append(self.pos)
+
+    def deliver_resource(self):
+        if self.has_resource and self.is_at_base():
+            self.collected_resources += 1
+            self.has_resource = False
+            if len(self.known_resources) > 0:
+                self.next_objective = self.known_resources.pop()
+            else:
+                self.next_objective = None
+
+    def go_to_next_objective(self):
+        
+        if self.next_objective is None or not self.known_resources:
+            return  # Evitar erro de índice se a lista estiver vazia
+
+        current_x, current_y = self.pos
+        destination_x, destination_y = self.next_objective
+        next_x = current_x + (1 if destination_x > current_x else -1 if destination_x < current_x else 0)
+        next_y = current_y + (1 if destination_y > current_y else -1 if destination_y < current_y else 0)
+
+        next_pos = (next_x, next_y)
+
+        if next_pos not in self.model.obstacles and not self.model.grid.out_of_bounds(next_pos):
+            self.model.grid.move_agent(self, next_pos)
+        else:
+            self.move()
+
+
+    def step(self):
+        self.collect_resource()
+        if self.has_resource:
+            self.go_back_to_base()
+            self.deliver_resource()
+        else:
+            if self.next_objective is not None:
+                print("NEXT OBJECTIVE NOT NONE")
+                self.go_to_next_objective()
+            else:
+                self.move()
