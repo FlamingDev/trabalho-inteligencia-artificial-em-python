@@ -1,9 +1,6 @@
 import random
 
 import mesa
-from mesa.time import RandomActivation
-from numpy.matlib import empty
-
 
 class SimpleAgent(mesa.Agent):
     def __init__(self, model):
@@ -24,14 +21,15 @@ class SimpleAgent(mesa.Agent):
 
         self.model.grid.move_agent(self, new_position)
 
-    def collect_resource(self):
+    def collect_resource_if_present(self):
         if not self.has_resource:
             cell_contents = self.model.grid.get_cell_list_contents(self.pos)
             for obj in cell_contents:
                 if isinstance(obj, Resource):
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                    break
+                    if obj.size != obj.HEAVY:
+                        self.has_resource = True
+                        self.model.grid.remove_agent(obj)
+                        return
 
     def go_back_to_base(self):
         if self.has_resource:
@@ -45,7 +43,7 @@ class SimpleAgent(mesa.Agent):
             if next_pos not in self.model.obstacles:
                 self.model.grid.move_agent(self, next_pos)
             else:
-                (self.move())
+                self.move()
 
     def is_at_base(self):
         return self.pos == self.model.base_pos
@@ -56,7 +54,7 @@ class SimpleAgent(mesa.Agent):
             self.has_resource = False
 
     def step(self):
-        self.collect_resource()
+        self.collect_resource_if_present()
         if self.has_resource:
             self.go_back_to_base()
             self.deliver_resource()
@@ -64,11 +62,11 @@ class SimpleAgent(mesa.Agent):
             self.move()
 
 class StateBasedAgent(SimpleAgent):
-    EXPLORED = True
-    UNEXPLORED = False
+    UNEXPLORED = 0
+    EXPLORED = 1
     def __init__(self, model):
         super().__init__(model)
-        self.explored = dict() # Dicionario que mapeia um par ordenado em -> Explorado/Não Explorado
+        self.explored = dict()
 
     def move(self):
         self.explored[self.pos] = self.EXPLORED
@@ -89,14 +87,6 @@ class StateBasedAgent(SimpleAgent):
 
         self.model.grid.move_agent(self, new_position)
 
-    def collect_resource(self):
-        if not self.has_resource:
-            cell_contents = self.model.grid.get_cell_list_contents(self.pos)
-            for obj in cell_contents:
-                if isinstance(obj, Resource):
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                    return
 
 class ObjectiveBasedAgent(StateBasedAgent):
     def __init__(self, model):
@@ -104,16 +94,15 @@ class ObjectiveBasedAgent(StateBasedAgent):
         self.known_resources = list()
         self.next_objective = None
 
-    def collect_resource(self):
+    def collect_resource_if_present(self):
         cell_contents = self.model.grid.get_cell_list_contents(self.pos)
         for obj in cell_contents:
             if isinstance(obj, Resource):
-                if not self.has_resource:
+                if not self.has_resource and obj.size != obj.HEAVY:
                     self.has_resource = True
                     self.model.grid.remove_agent(obj)
-                else:
-                    if self.pos not in self.known_resources:
-                        self.known_resources.append(self.pos)
+                elif self.pos not in self.known_resources and obj.size != obj.HEAVY:
+                    self.known_resources.append(self.pos)
 
     def deliver_resource(self):
         if self.has_resource and self.is_at_base():
@@ -132,7 +121,7 @@ class ObjectiveBasedAgent(StateBasedAgent):
 
         next_pos = (next_x, next_y)
 
-        if (next_pos == self.pos):
+        if next_pos == self.pos:
             self.next_objective = None
 
 
@@ -143,13 +132,13 @@ class ObjectiveBasedAgent(StateBasedAgent):
 
 
     def step(self):
-        self.collect_resource()
+        self.collect_resource_if_present()
         if self.has_resource:
             self.go_back_to_base()
             self.deliver_resource()
         else:
             if self.next_objective is not None:
-                print("NEXT OBJECTIVE NOT NONE")
+                print(f"{self.unique_id } TEM UM OBJETIVO AGORA")
                 self.go_to_next_objective()
             else:
                 self.move()
@@ -225,7 +214,12 @@ class Planet(mesa.Model):
                 if len(cell_contents) > 0:
                     for obj in cell_contents:
                         if isinstance(obj, Resource):
-                            print(f"{RED}R{RESET}  ", end="")
+                            if obj.size == obj.SMALL:
+                                print(f"{RED}SR{RESET}  ", end="")
+                            elif obj.size == obj.MEDIUM:
+                                print(f"{RED}MR{RESET}  ", end="")
+                            elif obj.size == obj.HEAVY:
+                                print(f"{RED}HR{RESET}  ", end="")
                         elif isinstance(obj, Obstacle):
                             print("O  ", end="")
                         elif isinstance(obj, SimpleAgent):
@@ -233,7 +227,6 @@ class Planet(mesa.Model):
                                 print(f"{BLUE}{obj.unique_id}{RESET}  ", end="")
                             else:
                                 print(f"{GREEN}{obj.unique_id}{RESET}  ", end="")
-
                         else:
                             print("X  ", end="")
                 else:
