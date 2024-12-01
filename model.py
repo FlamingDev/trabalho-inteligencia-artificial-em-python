@@ -30,6 +30,14 @@ class SimpleAgent(mesa.Agent):
                         self.has_resource = True
                         self.model.grid.remove_agent(obj)
                         return
+                    else:
+                        obj.carry+=1
+                        if(obj.carry>1):
+                            self.has_resource = True
+                            self.model.grid.remove_agent(obj)
+                            obj.carry-=1
+                        else:
+                            obj.carry-=1
 
     def go_back_to_base(self):
         if self.has_resource:
@@ -148,9 +156,10 @@ class Resource(mesa.Agent):
     MEDIUM = 1
     HEAVY = 2
 
-    def __init__(self, size, model):
+    def __init__(self, size, model, carry):
         super().__init__(model)
         self.size = size
+        self.carry = 0
         if size == self.SMALL:
             self.utility = 10
         elif size == self.MEDIUM:
