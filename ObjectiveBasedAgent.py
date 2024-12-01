@@ -10,31 +10,28 @@ class ObjectiveBasedAgent(StateBasedAgent):
         self.color = "black" 
         self.shape = "cross"
 
-    def collect_resource(self):
+    def collect_resource_if_present(self):
         cell_contents = self.model.grid.get_cell_list_contents(self.pos)
         for obj in cell_contents:
             if isinstance(obj, Resource):
-                if not self.has_resource:
+                if not self.has_resource and obj.size != obj.HEAVY:
+                    print(f"Removendo recurso: {obj.type}, Cor: {obj.color}, Forma: {obj.shape}")
                     self.has_resource = True
                     self.model.grid.remove_agent(obj)
-                else:
-                    if self.pos not in self.known_resources:
-                        self.known_resources.append(self.pos)
+                elif self.pos not in self.known_resources and obj.size != obj.HEAVY:
+                    self.known_resources.append(self.pos)
+
 
     def deliver_resource(self):
         if self.has_resource and self.is_at_base():
             self.collected_resources += 1
-            self.has_resource = False
+            self.has_resource = False   
             if len(self.known_resources) > 0:
                 self.next_objective = self.known_resources.pop()
             else:
                 self.next_objective = None
 
     def go_to_next_objective(self):
-        
-        if self.next_objective is None or not self.known_resources:
-            return  # Evitar erro de índice se a lista estiver vazia
-
         current_x, current_y = self.pos
         destination_x, destination_y = self.next_objective
         next_x = current_x + (1 if destination_x > current_x else -1 if destination_x < current_x else 0)
@@ -42,20 +39,40 @@ class ObjectiveBasedAgent(StateBasedAgent):
 
         next_pos = (next_x, next_y)
 
-        if next_pos not in self.model.obstacles and not self.model.grid.out_of_bounds(next_pos):
+        if next_pos == self.pos:
+            self.next_objective = None
+
+
+        if next_pos not in self.model.obstacles:
             self.model.grid.move_agent(self, next_pos)
         else:
             self.move()
 
 
     def step(self):
-        self.collect_resource()
+        self.collect_resource_if_present()
         if self.has_resource:
             self.go_back_to_base()
             self.deliver_resource()
         else:
             if self.next_objective is not None:
-                print("NEXT OBJECTIVE NOT NONE")
+                print(f"{self.unique_id } TEM UM OBJETIVO AGORA")
                 self.go_to_next_objective()
             else:
                 self.move()
+
+    @property
+    def color(self):
+        return self._color
+
+    @property
+    def shape(self):
+        return self._shape
+    
+    @shape.setter
+    def shape(self, value):
+        self._shape = value
+    
+    @color.setter
+    def color(self, value):
+        self._color = value

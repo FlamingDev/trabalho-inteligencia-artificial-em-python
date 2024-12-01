@@ -14,12 +14,29 @@ class Resource(mesa.Agent):
         if size == self.SMALL:
             self.utility = 10
             
-            self.color = "green" 
+            self.color = "blue" 
         elif size == self.MEDIUM:
             self.utility = 20
             
             self.color = "orange" 
         else:
             self.utility = 50
-            
             self.color = "red" 
+
+    @property
+    def color(self):
+        return self._color
+
+    @property
+    def shape(self):
+        return self._shape
+    
+    @shape.setter
+    def shape(self, value):
+        print(f"Alterando cor de {self.type} para {value}")
+        self._shape = value
+    
+    @color.setter
+    def color(self, value):
+        print(f"Alterando cor de {self.type} para {value}")
+        self._color = value

@@ -31,11 +31,19 @@ class StateBasedAgent(SimpleAgent):
 
         self.model.grid.move_agent(self, new_position)
 
-    def collect_resource(self):
-        if not self.has_resource:
-            cell_contents = self.model.grid.get_cell_list_contents(self.pos)
-            for obj in cell_contents:
-                if isinstance(obj, Resource):
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                    return
+
+    @property
+    def color(self):
+        return self._color
+
+    @property
+    def shape(self):
+        return self._shape
+    
+    @shape.setter
+    def shape(self, value):
+        self._shape = value
+    
+    @color.setter
+    def color(self, value):
+        self._color = value

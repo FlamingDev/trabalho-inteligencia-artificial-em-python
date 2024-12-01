@@ -29,15 +29,17 @@ class SimpleAgent(mesa.Agent):
         # Move o agente para a nova posição
         self.model.grid.move_agent(self, new_position)
 
-    def collect_resource(self):
+    def collect_resource_if_present(self):
         
         cell_contents = self.model.grid.get_cell_list_contents(self.pos)
         if cell_contents:  # Verificar se a célula não está vazia
             for obj in cell_contents:
                 if isinstance(obj, Resource):
-                    self.has_resource = True
-                    self.model.grid.remove_agent(obj)
-                    break
+                    if obj.size != obj.HEAVY:
+                        self.has_resource = True
+                        self.model.grid.remove_agent(obj)
+                        print(f"Removendo recurso: {obj.type}, Cor: {obj.color}, Forma: {obj.shape}")
+                        return
         
 
     def go_back_to_base(self):
@@ -63,11 +65,26 @@ class SimpleAgent(mesa.Agent):
             self.has_resource = False
 
     def step(self):
-        #self.color = "blue" if self.has_resource else "green"
         print(f"Agente {self.unique_id} na posição {self.pos}, tem recurso? {self.has_resource}")
-        self.collect_resource()
+        self.collect_resource_if_present()
         if self.has_resource:
             self.go_back_to_base()
             self.deliver_resource()
         else:
             self.move()
+
+    @property
+    def color(self):
+        return self._color
+
+    @property
+    def shape(self):
+        return self._shape
+    
+    @shape.setter
+    def shape(self, value):
+        self._shape = value
+    
+    @color.setter
+    def color(self, value):
+        self._color = value

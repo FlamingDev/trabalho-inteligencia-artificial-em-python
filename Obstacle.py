@@ -6,4 +6,4 @@ class Obstacle(mesa.Agent):
         super().__init__(model)
         self.type = "Obstacle" 
         self.color = "gray"  
-        self.shape = "cross"  
+        self.shape = "diamond"  
