@@ -1,6 +1,6 @@
 from model import *
 
-model = Planet(0,0,1,8, 8, 230, seed = 12)
+model = Planet(0,0,0, 2,8, 8, 50, 5, seed = 12)
 
 for _ in range(100):
     model.show_grid()
@@ -9,7 +9,7 @@ for _ in range(100):
 s = 0
 for agent in model.agents:
     if isinstance(agent, SimpleAgent):
-        print(f"agent {agent.unique_id} has collected {agent.collected_resources} resources")
+        print(f"agent {agent.unique_id} has collected {agent.collected_resources} resources and has score {agent.score}")
         s += agent.collected_resources
 print("soma = ", s)
 
