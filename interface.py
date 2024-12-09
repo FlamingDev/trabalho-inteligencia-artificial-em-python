@@ -14,6 +14,7 @@ n_obstacles = st.sidebar.slider("Número de Obstáculos", 0, 20, 5)
 n_SA = st.sidebar.slider("Agentes Simples", 0, 20, 5)
 n_SBA = st.sidebar.slider("Agentes Baseados em Estado", 0, 20, 0)
 n_OBA = st.sidebar.slider("Agentes Baseados em Objetivo", 0, 20, 0)
+n_CA = st.sidebar.slider("Agentes Cooperativos", 0, 20, 0)
 
 
 if "model" not in st.session_state:
@@ -25,6 +26,7 @@ if st.button("Rodar simulação"):
         n_SA=n_SA,
         n_SBA=n_SBA,
         n_OBA=n_OBA,
+        n_CA=n_CA,
         height=altura,
         width=largura,
         n_resources=n_resources,

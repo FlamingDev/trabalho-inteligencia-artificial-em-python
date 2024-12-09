@@ -15,21 +15,27 @@ class ObjectiveBasedAgent(StateBasedAgent):
         for obj in cell_contents:
             if isinstance(obj, Resource):
                 if not self.has_resource and obj.size != obj.HEAVY:
-                    print(f"Removendo recurso: {obj.type}, Cor: {obj.color}, Forma: {obj.shape}")
                     self.has_resource = True
+                    self.current_resource = obj
                     self.model.grid.remove_agent(obj)
                 elif self.pos not in self.known_resources and obj.size != obj.HEAVY:
+                    print(f" {self.unique_id} está EMPILHANDO MEMORIA")
                     self.known_resources.append(self.pos)
-
 
     def deliver_resource(self):
         if self.has_resource and self.is_at_base():
-            self.collected_resources += 1
-            self.has_resource = False   
-            if len(self.known_resources) > 0:
-                self.next_objective = self.known_resources.pop()
-            else:
-                self.next_objective = None
+            if self.current_resource is not None:
+                self.collected_resources += 1
+                self.score += self.current_resource.utility
+            self.current_resource = None
+            self.has_resource = False
+
+    def get_next_objective(self):
+        if len(self.known_resources) > 0:
+            self.next_objective = self.known_resources.pop()
+        else:
+            print(f"{self.unique_id} nao tem mais um objetivo...")
+            self.next_objective = None
 
     def go_to_next_objective(self):
         current_x, current_y = self.pos
@@ -54,6 +60,8 @@ class ObjectiveBasedAgent(StateBasedAgent):
         if self.has_resource:
             self.go_back_to_base()
             self.deliver_resource()
+            if self.is_at_base():
+                self.get_next_objective()
         else:
             if self.next_objective is not None:
                 print(f"{self.unique_id } TEM UM OBJETIVO AGORA")
